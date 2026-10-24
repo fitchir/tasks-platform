@@ -1,0 +1,23 @@
+{
+  "name": "tasks-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API de tâches pour apprendre CI/CD et DevOps",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "jest --runInBand",
+    "lint": "eslint src tests"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "jest": "^30.2.0",
+    "supertest": "^7.1.4"
+  }
+}

@@ -1,0 +1,86 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  ci:
+    name: Tests, lint et scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v7
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Vérifier le code
+        run: npm run lint
+
+      - name: Lancer les tests
+        run: npm test
+
+      - name: Construire l'image Docker
+        run: docker build -t tasks-platform:${{ github.sha }} .
+
+      - name: Scanner l'image avec Trivy
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: tasks-platform:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL
+
+  publish:
+    name: Publier sur GHCR
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v7
+
+      - name: Construire l'image Docker
+        run: docker build -t tasks-platform:${{ github.sha }} .
+
+      - name: Scanner l'image avant publication
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: tasks-platform:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL
+
+      - name: Se connecter à GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Publier l'image
+        env:
+          IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/tasks-platform
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          image_name="$(printf '%s' "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
+          docker tag "tasks-platform:$IMAGE_TAG" "$image_name:$IMAGE_TAG"
+          docker push "$image_name:$IMAGE_TAG"
