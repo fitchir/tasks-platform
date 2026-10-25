@@ -1,5 +1,18 @@
 const request = require('supertest');
 const app = require('../src/app');
+const { pool, initializeDatabase } = require('../src/db');
+
+beforeAll(async () => {
+  await initializeDatabase();
+});
+
+beforeEach(async () => {
+  await pool.query('DELETE FROM tasks');
+});
+
+afterAll(async () => {
+  await pool.end();
+});
 
 describe('Routes /tasks', () => {
   it('crée une tâche avec un titre valide', async () => {
@@ -26,10 +39,17 @@ describe('Routes /tasks', () => {
     expect(response.body.error).toBeDefined();
   });
 
-  it('renvoie la liste des tâches', async () => {
+  it('renvoie les tâches enregistrées en base', async () => {
+    const title = `Tâche de test ${Date.now()}`;
+
+    await request(app).post('/tasks').send({ title });
     const response = await request(app).get('/tasks');
 
     expect(response.status).toBe(200);
-    expect(Array.isArray(response.body)).toBe(true);
+    expect(response.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ title, completed: false }),
+      ])
+    );
   });
 });
